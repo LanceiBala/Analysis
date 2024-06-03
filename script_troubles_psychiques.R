@@ -21,7 +21,7 @@ library(labelled)
 library(questionr)
 library(skimr)
 library(gtsummary)
-db <- read_xlsx("Base_M2_SPSD_Dénis_revue.xlsx")
+db <- read_xlsx("Base_M2_SPSD_Dénis_revue-1.xlsx")
 
 #######
 View(db)
@@ -30,7 +30,7 @@ names(db)
 str(db)
 #######
 ######
-glimpse(db$poss_terr_autr_bien)
+glimpse(db)
 look_for(db)
 skim(db)
 dput(names(db))
@@ -68,10 +68,12 @@ var_corrige <- c("N°", "age", "st_mat", "exi_coe", "duree_union",
   "trouble_psychiques_dpist_J6_postpartum", "trouble_psychique_dpist_J42_postpartum", "period_depist_postpartum",
   "dépression_post_natale", 
   "stress_post_traumatique", "diffi_adaptation_liées_histo_ou_cont_vie", 
-  "anxiete", "troubles_bipolaires", "Blue_du_post-partum", "troubles_psychique_post-partum", 
+  "anxiete", "troubles_bipolaires", "Blue_du_post-partum", "troubles_psychique_post_partum", 
   "duree_evolut_troubles_psychique", 
   "impact_evolut_troubles_psychique_J6postpartum", "impact_evolut_troubles_psychique_J42postpartum"
 )
+
+length(var_corrige)
 
 names(db) <- var_corrige
 
@@ -87,8 +89,8 @@ table(db$tranch_age)
 
 
 db <- db %>% mutate(tranch_age_con =  cut(age_conj,
-                                      breaks = c(0, 18, 20,40,  Inf),
-                                      labels = c(" < 18 ans", "18-20 ans", "21-40 ans", "40 et plus"),
+                                      breaks = c( 21,40,  Inf),
+                                      labels = c("21-40 ans", "40 et plus"),
                                       right = FALSE), .after = age_conj)
 table(db$tranch_age_con)
 
@@ -103,6 +105,7 @@ db <- db %>% mutate(tranch_duree_union =  cut(duree_union,
                                               right = FALSE), .after = duree_union)
 table(db$tranch_duree_union)
  View(db)
+ 
 # Transformer les variables charactere en factor
 
 db <- db %>% mutate_if(is.character, as.factor)
@@ -140,7 +143,7 @@ lapply(db_freq_1, function(x) freq(x, total = TRUE, valid = FALSE))
 
 # TEST D INDEPENDANCES DES VARIABLES
 
-v_ex <-  c( "tranch_age", "st_mat", "exi_coe", "tranch_duree_union", 
+v_ex_ch2 <-  c( "tranch_age", "st_mat", "exi_coe", "tranch_duree_union", 
                 
                 "niv_sco", "res_vil_titao", 
                 "Statut", "Provenance", "lieu_acc", "poss_terr_autr_bien", 
@@ -167,6 +170,8 @@ v_ex <-  c( "tranch_age", "st_mat", "exi_coe", "tranch_duree_union",
 ###############################################
 
 # Fonction pour effectuer le test du chi-carré ou le test exact de Fisher pour chaque variable
+# Nous allons tester d'abord si les conditions pour appliquer le CH2 sont réunies : (plus de cinq valeurs attendues pour chaque combinaison de variables.)
+
 test_independance <- function(outcome, factor) {
   tbl <- table(outcome, factor)
   
@@ -206,6 +211,7 @@ test_independance <- function(outcome, factor) {
   tbl <- table(outcome, factor)
   
   # Vérifier si les effectifs théoriques sont suffisants pour utiliser le chi-carré
+  
   chi2_test <- chisq.test(tbl, simulate.p.value = TRUE)
   if (any(chi2_test$expected < 5)) {
     cat("Utilisation du test exact de Fisher en raison des effectifs faibles.\n")
@@ -217,9 +223,11 @@ test_independance <- function(outcome, factor) {
 }
 
 # Liste pour stocker les résultats
+
 resultats_tests <- list()
 
 # Effectuer le test pour chaque facteur
+
 for (facteur in v_ex) {
   cat("\nTest pour", facteur, ":\n")
   test_result <- test_independance(db$stress_post_traumatique, db[[facteur]])
@@ -341,3 +349,57 @@ for (facteur in names(resultats_tests)) {
 
 ############################## ANALYSE MULTI ######################
 ###################################################################
+
+# RECHERCHE DE VARIABLES POTENTIELLES POUR LE MODEL LOGI
+
+test_ind_for_log <- function(outcome, factor) {
+  tbl <- table(outcome, factor)
+  
+  # Vérifier si les effectifs théoriques sont suffisants pour utiliser le chi-carré
+  chi2_test <- chisq.test(tbl, simulate.p.value = TRUE)
+  if (any(chi2_test$expected < 5)) {
+    cat("Utilisation du test exact de Fisher en raison des effectifs faibles.\n")
+    test <- fisher.test(tbl)
+  } else {
+    test <- chi2_test
+  }
+  return(test)
+}
+
+# Liste pour stocker les résultats
+res_test_for_log <- list()
+
+# Effectuer le test pour chaque facteur
+for (facteur in v_ex) {
+  cat("\nTest pour", facteur, ":\n")
+  test_result <- test_ind_for_log(db$troubles_psychique_post_partum, db[[facteur]])
+  res_test_for_log[[facteur]] <- test_result
+  print(test_result)
+}
+
+# Résumé des résultats
+cat("\nRésumé des résultats des tests:\n")
+for (facteur in names(res_test_for_log)) {
+  if (res_test_for_log[[facteur]]$p.value < 0.05)
+  cat("\nVariable:", facteur, "\n")
+  print(res_test_for_log[[facteur]]$p.value)
+}
+
+
+
+#evolution_clinique_CPON6_jr
+#EvolutioncliniqueCPONJ42
+#psychotherapie
+#ECG
+#suspicion_malform_prenat
+#deces_enf
+
+# Création du modèle de régression logistique
+
+model <- glm(troubles_psychique_post_partum ~ evolution_clinique_CPON6_jr + EvolutioncliniqueCPONJ42  
+             + psychotherapie + deces_enf,
+             data = db, family = binomial)
+summary(model)           
+             
+
+
