@@ -72,12 +72,13 @@ var_corrige <- c("N°", "age", "st_mat", "exi_coe", "duree_union",
   "duree_evolut_troubles_psychique", 
   "impact_evolut_troubles_psychique_J6postpartum", "impact_evolut_troubles_psychique_J42postpartum"
 )
-
+################
 length(var_corrige)
 
 names(db) <- var_corrige
 
 View(db)
+############""
 
 # CREATION DE LA VARIABLE TRANCHE AGE
 
